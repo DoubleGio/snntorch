@@ -308,6 +308,10 @@ class mse_count_loss(LossFunctions):
         ``population_code=True``. Must be a factor of the number of output
         neurons if population code is enabled. Defaults to ``False``
     :type num_classes: int, optional
+    :param weight: Class weight per target class, indexed by the target
+        label. Each sample's weight scales every output of that sample.
+        Defaults to ``None``
+    :type weight: torch.Tensor, optional
 
     :return: Loss
     :rtype: torch.Tensor (single element)
@@ -372,7 +376,7 @@ class mse_count_loss(LossFunctions):
         loss = loss_fn(spike_count, spike_count_target)
 
         if self.weight is not None:
-            loss = loss * self.weight[targets]
+            loss = loss * self.weight[targets].unsqueeze(-1)
 
         return loss / num_steps
 
@@ -408,6 +412,10 @@ class mse_membrane_loss(LossFunctions):
     :param off_target: Specify target membrane potential for incorrect class,
         defaults to ``0``
     :type off_target: float, optional
+    :param weight: Class weight per target class, indexed by the target
+        label. Each sample's weight scales every output of that sample.
+        Defaults to ``None``
+    :type weight: torch.Tensor, optional
 
     :return: Loss
     :rtype: torch.Tensor (single element)
@@ -456,7 +464,7 @@ class mse_membrane_loss(LossFunctions):
                 loss += loss_fn(mem_out[step], targets_spikes)
 
         if self.weight is not None:
-            loss = loss * self.weight[targets]
+            loss = loss * self.weight[targets].unsqueeze(-1)
 
         return loss / num_steps
 
@@ -595,6 +603,10 @@ class SpikeTime(nn.Module):
         def forward(ctx, spk_rec, spk_count, device="cpu"):
             spk_rec_tmp = spk_rec.clone()
             spk_time_rec = []
+            batch_idx = torch.arange(
+                spk_rec.size(1), device=spk_rec.device
+            ).unsqueeze(1)
+            output_idx = torch.arange(spk_rec.size(2), device=spk_rec.device)
 
             for step in range(spk_count):
                 """Convert spk_rec of 1/0s [TxBxN] --> spk_time [TxBxN].
@@ -629,7 +641,7 @@ class SpikeTime(nn.Module):
 
                 """before looping, eliminate n-th spike. this avoids double
                 counting spikes."""
-                spk_rec_tmp[nth_spike_time.long()] = 0
+                spk_rec_tmp[nth_spike_time.long(), batch_idx, output_idx] = 0
 
             """Pass this into loss function."""
             spk_time_rec = torch.stack(spk_time_rec)
@@ -811,6 +823,10 @@ class mse_temporal_loss:
     :param multi_spike: Specify if multiple spikes in target. Defaults to
         ``False``
     :type multi_spike: bool, optional
+    :param weight: Class weight per target class, indexed by the target
+        label. Each sample's weight scales every output of that sample.
+        Defaults to ``None``
+    :type weight: torch.Tensor, optional
 
     :return: Loss
     :rtype: torch.Tensor (single element)
@@ -848,8 +864,8 @@ class mse_temporal_loss:
         )  # spk_time_final: num_spikes x B x Nc. # Same with targets.
 
         if self.weight is not None:
-            loss = loss * self.weight[targets]
-            if self.reduction == "mean":
+            loss = loss * self.weight[targets].unsqueeze(-1)
+            if self.reduction == 'mean':
                 loss = loss.mean()
 
         return loss
