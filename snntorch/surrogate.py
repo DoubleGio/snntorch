@@ -8,6 +8,18 @@ import math
 # parameterizes the transition rate of the surrogate gradients."""
 
 
+class ATanSurrogate:
+    def __init__(self, alpha=2.0):
+        self.alpha = alpha
+
+    def __call__(self, x):
+        return ATan.apply(x, self.alpha)
+
+
+def atan(alpha=2.0):
+    return ATanSurrogate(alpha)
+
+
 class StraightThroughEstimator(torch.autograd.Function):
     """
     Straight Through Estimator.
@@ -31,7 +43,7 @@ class StraightThroughEstimator(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, input_):
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         return out
 
     @staticmethod
@@ -78,7 +90,7 @@ class Triangular(torch.autograd.Function):
     def forward(ctx, input_, threshold):
         ctx.save_for_backward(input_)
         ctx.threshold = threshold
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         return out
 
     @staticmethod
@@ -132,7 +144,7 @@ class FastSigmoid(torch.autograd.Function):
     def forward(ctx, input_, slope):
         ctx.save_for_backward(input_)
         ctx.slope = slope
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         return out
 
     @staticmethod
@@ -187,7 +199,7 @@ class ATan(torch.autograd.Function):
     def forward(ctx, input_, alpha):
         ctx.save_for_backward(input_)
         ctx.alpha = alpha
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         return out
 
     @staticmethod
@@ -201,16 +213,6 @@ class ATan(torch.autograd.Function):
             * grad_input
         )
         return grad, None
-
-
-def atan(alpha=2.0):
-    """ArcTan surrogate gradient enclosed with a parameterized slope."""
-    alpha = alpha
-
-    def inner(x):
-        return ATan.apply(x, alpha)
-
-    return inner
 
 
 # @staticmethod
@@ -240,7 +242,7 @@ class Heaviside(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, input_):
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         ctx.save_for_backward(out)
         return out
 
@@ -294,19 +296,20 @@ class Sigmoid(torch.autograd.Function):
     def forward(ctx, input_, slope):
         ctx.save_for_backward(input_)
         ctx.slope = slope
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         return out
 
     @staticmethod
     def backward(ctx, grad_output):
         (input_,) = ctx.saved_tensors
         grad_input = grad_output.clone()
-        grad = (
-            grad_input
-            * ctx.slope
-            * torch.exp(-ctx.slope * input_)
-            / ((torch.exp(-ctx.slope * input_) + 1) ** 2)
-        )
+        # equivalent to
+        #   slope * exp(-slope * input_) / (exp(-slope * input_) + 1) ** 2
+        # but numerically stable:
+        # the exponential form overflows to inf / inf = nan once the absolute
+        # value of -slope * input_ exceeds ~88
+        sig = torch.sigmoid(ctx.slope * input_)
+        grad = grad_input * ctx.slope * sig * (1.0 - sig)
         return grad, None
 
 
@@ -355,9 +358,10 @@ class SpikeRateEscape(torch.autograd.Function):
         ctx.save_for_backward(input_)
         ctx.beta = beta
         ctx.slope = slope
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         return out
 
+    @staticmethod
     def backward(ctx, grad_output):
         (input_,) = ctx.saved_tensors
         grad_input = grad_output.clone()
@@ -382,7 +386,6 @@ def spike_rate_escape(beta=1, slope=25):
 
 
 class StochasticSpikeOperator(torch.autograd.Function):
-
     """
     Surrogate gradient of the Heaviside step function.
 
@@ -430,7 +433,7 @@ class StochasticSpikeOperator(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, input_, mean, variance):
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         ctx.save_for_backward(input_, out)
         ctx.mean = mean
         ctx.variance = variance
@@ -438,7 +441,7 @@ class StochasticSpikeOperator(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        (input_, out) = ctx.saved_tensors
+        input_, out = ctx.saved_tensors
         grad_input = grad_output.clone()
         grad = grad_input * out + (grad_input * (~out.bool()).float()) * (
             (torch.rand_like(input_) - 0.5 + ctx.mean) * ctx.variance
@@ -459,7 +462,6 @@ def SSO(mean=0, variance=0.2):
 
 
 class LeakySpikeOperator(torch.autograd.Function):
-
     """
     Surrogate gradient of the Heaviside step function.
 
@@ -492,7 +494,7 @@ class LeakySpikeOperator(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, input_, slope):
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         ctx.save_for_backward(out)
         ctx.slope = slope
         return out
@@ -512,7 +514,7 @@ def LSO(slope=0.1):
     slope = slope
 
     def inner(x):
-        return StochasticSpikeOperator.apply(x, slope)
+        return LeakySpikeOperator.apply(x, slope)
 
     return inner
 
@@ -554,7 +556,7 @@ class SparseFastSigmoid(torch.autograd.Function):
         ctx.save_for_backward(input_)
         ctx.slope = slope
         ctx.B = B
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         return out
 
     @staticmethod
@@ -644,7 +646,7 @@ class CustomSurrogate(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, input_, custom_surrogate_function):
-        out = (input_ > 0).float()
+        out = (input_ > 0).to(input_.dtype)
         ctx.save_for_backward(input_, out)
         ctx.custom_surrogate_function = custom_surrogate_function
         return out

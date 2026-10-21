@@ -16,7 +16,6 @@ import hashlib
 
 
 def download_url(url, root, filename=None, md5=None, total_size=None):
-
     """Download a file from a url and place it in root.
 
     :param url: URL to download file from

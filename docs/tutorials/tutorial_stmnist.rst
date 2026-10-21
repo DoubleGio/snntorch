@@ -308,7 +308,7 @@ seperating the data we will transform them using ``.ToFrame()`` as well.
     frame_transform = transforms.Compose([transforms.ToFrame(sensor_size=sensor_size, time_window=20000)])
 
 The following code reads out the a portion of the dataset, transforms
-the events using ``frame_transform`` defined above, and then seperates
+the events using ``frame_transform`` defined above, and then separates
 the data into a trainset and a testset. On top of that, ``.ToFrame()``
 is applied each time. Thus, this code snippet might take a few minutes.
 
@@ -404,7 +404,7 @@ architecture: ``10×10-32c4-64c3-MaxPool2d(2)-10o``.
 
 ::
 
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
     
     # neuron and simulation parameters
     beta = 0.95

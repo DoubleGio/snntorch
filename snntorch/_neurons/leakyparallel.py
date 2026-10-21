@@ -4,143 +4,143 @@ import torch.nn as nn
 
 class LeakyParallel(nn.Module):
     """
-    A parallel implementation of the Leaky neuron with a fused input linear layer.
-    All time steps are passed to the input at once. 
-    This implementation uses `torch.nn.RNN` to accelerate the implementation.
+     A parallel implementation of the Leaky neuron with a fused input linear layer.
+     All time steps are passed to the input at once.
+     This implementation uses `torch.nn.RNN` to accelerate the implementation.
 
-    First-order leaky integrate-and-fire neuron model.
-    Input is assumed to be a current injection.
-    Membrane potential decays exponentially with rate beta.
-    For :math:`U[T] > U_{\\rm thr} ⇒ S[T+1] = 1`.
+     First-order leaky integrate-and-fire neuron model.
+     Input is assumed to be a current injection.
+     Membrane potential decays exponentially with rate beta.
+     For :math:`U[T] > U_{\\rm thr} ⇒ S[T+1] = 1`.
 
-    .. math::
+     .. math::
 
-            U[t+1] = βU[t] + I_{\\rm in}[t+1]
-
-
-    * :math:`I_{\\rm in}` - Input current
-    * :math:`U` - Membrane potential
-    * :math:`U_{\\rm thr}` - Membrane threshold
-    * :math:`β` - Membrane potential decay rate
-
-    Several differences between `LeakyParallel` and `Leaky` include:
-    
-    * Negative hidden states are clipped due to the 
-        forced ReLU operation in RNN.
-    * Linear weights are included in addition to 
-        recurrent weights.
-    * `beta` is clipped between [0,1] and cloned to 
-        `weight_hh_l` only upon layer initialization. It is unused otherwise.
-    * There is no explicit reset mechanism.
-    * Several functions such as `init_hidden`, `output`, 
-        `inhibition`, and `state_quant` are unavailable in `LeakyParallel`.
-    * Only the output spike is returned. Membrane potential is not accessible by default.
-    * RNN uses a hidden matrix of size (num_hidden, num_hidden) 
-    to transform the hidden state vector. This would 'leak' the membrane potential between LIF neurons, and so the hidden matrix is forced to a diagonal matrix by default.  This can be disabled by setting `weight_hh_enable=True`.
-
-    Example::
-
-        import torch
-        import torch.nn as nn
-        import snntorch as snn
-
-        beta = 0.5
-        num_inputs = 784
-        num_hidden = 128
-        num_outputs = 10
-        batch_size = 128
-        x = torch.rand((num_steps, batch_size, num_inputs))
-
-        # Define Network
-        class Net(nn.Module):
-            def __init__(self):
-                super().__init__()
-
-                # initialize layers
-                self.lif1 = snn.LeakyParallel(input_size=num_inputs, hidden_size=num_hidden) # randomly initialize recurrent weights
-                self.lif2 = snn.LeakyParallel(input_size=num_hidden, hidden_size=num_outputs, beta=beta, learn_beta=True) # learnable recurrent weights initialized at beta
-
-            def forward(self, x):
-                spk1 = self.lif1(x)
-                spk2 = self.lif2(spk1)
-                return spk2     
-
-        
-    :param input_size: The number of expected features in the input `x`
-    :type input_size: int
-
-    :param hidden_size: The number of features in the hidden state `h`
-    :type hidden_size: int
-
-    :param beta: membrane potential decay rate. Clipped between 0 and 1 
-    during the forward-pass. May be a single-valued tensor (i.e., equal decay rate for all neurons in a layer), or multi-valued (one weight per neuron). If left unspecified, then the decay rates will be randomly initialized based on PyTorch's initialization for RNN. Defaults to None
-    :type beta: float or torch.tensor, optional
-
-    :param bias: If `False`, then the layer does not use bias weights `b_ih` and `b_hh`. Defaults to True
-    :type bias: Bool, optional
-
-    :param threshold: Threshold for :math:`mem` to reach in order to
-        generate a spike `S=1`. Defaults to 1
-    :type threshold: float, optional
-
-    :param dropout: If non-zero, introduces a Dropout layer on the RNN output with dropout probability equal to dropout. Defaults to 0
-    :type dropout: float, optional
-
-    :param spike_grad: Surrogate gradient for the term dS/dU. Defaults to
-        None (corresponds to ATan surrogate gradient. See
-        `snntorch.surrogate` for more options)
-    :type spike_grad: surrogate gradient function from snntorch.surrogate,
-        optional
-
-    :param surrogate_disable: Disables surrogate gradients regardless of
-        `spike_grad` argument. Useful for ONNX compatibility. Defaults
-        to False
-    :type surrogate_disable: bool, Optional
-
-    :param learn_beta: Option to enable learnable beta. Defaults to False
-    :type learn_beta: bool, optional
-
-    :param learn_threshold: Option to enable learnable threshold. Defaults
-        to False
-    :type learn_threshold: bool, optional
-
-    :param weight_hh_enable: Option to set the hidden matrix to be dense or 
-    diagonal. Diagonal (i.e., False) adheres to how a LIF neuron works. Dense (True) would allow the membrane potential of one LIF neuron to influence all others, and follow the RNN default implementation. Defaults to False
-    :type weight_hh_enable: bool, optional
+             U[t+1] = βU[t] + I_{\\rm in}[t+1]
 
 
-    Inputs: \\input_
-        - **input_** of shape of  shape `(L, H_{in})` for unbatched input, 
-            or `(L, N, H_{in})` containing the features of the input sequence. 
+     * :math:`I_{\\rm in}` - Input current
+     * :math:`U` - Membrane potential
+     * :math:`U_{\\rm thr}` - Membrane threshold
+     * :math:`β` - Membrane potential decay rate
 
-    Outputs: spk
-        - **spk** of shape `(L, batch, input_size)`: tensor containing the
-            output spikes.
-        
-    where:
+     Several differences between `LeakyParallel` and `Leaky` include:
 
-   * **`L** = sequence length`
-    
-   * **`N** = batch size`
+     * Negative hidden states are clipped due to the
+         forced ReLU operation in RNN.
+     * Linear weights are included in addition to
+         recurrent weights.
+     * `beta` is clipped between [0,1] and cloned to
+         `weight_hh_l` only upon layer initialization. It is unused otherwise.
+     * There is no explicit reset mechanism.
+     * Several functions such as `init_hidden`, `output`,
+         `inhibition`, and `state_quant` are unavailable in `LeakyParallel`.
+     * Only the output spike is returned. Membrane potential is not accessible by default.
+     * RNN uses a hidden matrix of size (num_hidden, num_hidden)
+     to transform the hidden state vector. This would 'leak' the membrane potential between LIF neurons, and so the hidden matrix is forced to a diagonal matrix by default.  This can be disabled by setting `weight_hh_enable=True`.
 
-   * **`H_{in}** = input_size`
+     Example::
 
-   * **`H_{out}** = hidden_size`
+         import torch
+         import torch.nn as nn
+         import snntorch as snn
 
-    Learnable Parameters:
-        - **rnn.weight_ih_l** (torch.Tensor) - the learnable input-hidden 
-            weights of shape (hidden_size, input_size).
-        - **rnn.weight_hh_l** (torch.Tensor) - the learnable hidden-hidden
-            weights of the k-th layer which are sampled from `beta` of shape 
-            (hidden_size, hidden_size).
-        - **bias_ih_l** - the learnable input-hidden bias of the k-th layer, 
-            of shape (hidden_size).
-        - **bias_hh_l** - the learnable hidden-hidden bias of the k-th layer, 
-            of shape (hidden_size).
-        - **threshold** (torch.Tensor) - optional learnable thresholds must be 
-            manually passed in, of shape `1` or`` (input_size).
-        - **graded_spikes_factor** (torch.Tensor) - optional learnable graded 
-            spike factor.
+         beta = 0.5
+         num_inputs = 784
+         num_hidden = 128
+         num_outputs = 10
+         batch_size = 128
+         x = torch.rand((num_steps, batch_size, num_inputs))
+
+         # Define Network
+         class Net(nn.Module):
+             def __init__(self):
+                 super().__init__()
+
+                 # initialize layers
+                 self.lif1 = snn.LeakyParallel(input_size=num_inputs, hidden_size=num_hidden) # randomly initialize recurrent weights
+                 self.lif2 = snn.LeakyParallel(input_size=num_hidden, hidden_size=num_outputs, beta=beta, learn_beta=True) # learnable recurrent weights initialized at beta
+
+             def forward(self, x):
+                 spk1 = self.lif1(x)
+                 spk2 = self.lif2(spk1)
+                 return spk2
+
+
+     :param input_size: The number of expected features in the input `x`
+     :type input_size: int
+
+     :param hidden_size: The number of features in the hidden state `h`
+     :type hidden_size: int
+
+     :param beta: membrane potential decay rate. Clipped between 0 and 1
+     during the forward-pass. May be a single-valued tensor (i.e., equal decay rate for all neurons in a layer), or multi-valued (one weight per neuron). If left unspecified, then the decay rates will be randomly initialized based on PyTorch's initialization for RNN. Defaults to None
+     :type beta: float or torch.tensor, optional
+
+     :param bias: If `False`, then the layer does not use bias weights `b_ih` and `b_hh`. Defaults to True
+     :type bias: Bool, optional
+
+     :param threshold: Threshold for :math:`mem` to reach in order to
+         generate a spike `S=1`. Defaults to 1
+     :type threshold: float, optional
+
+     :param dropout: If non-zero, introduces a Dropout layer on the RNN output with dropout probability equal to dropout. Note: LeakyParallel uses a single RNN layer, so dropout is manually applied to the output as PyTorch's nn.RNN dropout only applies to intermediate layers. Defaults to 0
+     :type dropout: float, optional
+
+     :param spike_grad: Surrogate gradient for the term dS/dU. Defaults to
+         None (corresponds to ATan surrogate gradient. See
+         `snntorch.surrogate` for more options)
+     :type spike_grad: surrogate gradient function from snntorch.surrogate,
+         optional
+
+     :param surrogate_disable: Disables surrogate gradients regardless of
+         `spike_grad` argument. Useful for ONNX compatibility. Defaults
+         to False
+     :type surrogate_disable: bool, Optional
+
+     :param learn_beta: Option to enable learnable beta. Defaults to False
+     :type learn_beta: bool, optional
+
+     :param learn_threshold: Option to enable learnable threshold. Defaults
+         to False
+     :type learn_threshold: bool, optional
+
+     :param weight_hh_enable: Option to set the hidden matrix to be dense or
+     diagonal. Diagonal (i.e., False) adheres to how a LIF neuron works. Dense (True) would allow the membrane potential of one LIF neuron to influence all others, and follow the RNN default implementation. Defaults to False
+     :type weight_hh_enable: bool, optional
+
+
+     Inputs: \\input_
+         - **input_** of shape of  shape `(L, H_{in})` for unbatched input,
+             or `(L, N, H_{in})` containing the features of the input sequence.
+
+     Outputs: spk
+         - **spk** of shape `(L, batch, input_size)`: tensor containing the
+             output spikes.
+
+     where:
+
+    * **`L** = sequence length`
+
+    * **`N** = batch size`
+
+    * **`H_{in}** = input_size`
+
+    * **`H_{out}** = hidden_size`
+
+     Learnable Parameters:
+         - **rnn.weight_ih_l** (torch.Tensor) - the learnable input-hidden
+             weights of shape (hidden_size, input_size).
+         - **rnn.weight_hh_l** (torch.Tensor) - the learnable hidden-hidden
+             weights of the k-th layer which are sampled from `beta` of shape
+             (hidden_size, hidden_size).
+         - **bias_ih_l** - the learnable input-hidden bias of the k-th layer,
+             of shape (hidden_size).
+         - **bias_hh_l** - the learnable hidden-hidden bias of the k-th layer,
+             of shape (hidden_size).
+         - **threshold** (torch.Tensor) - optional learnable thresholds must be
+             manually passed in, of shape `1` or`` (input_size).
+         - **graded_spikes_factor** (torch.Tensor) - optional learnable graded
+             spike factor.
 
     """
 
@@ -164,6 +164,9 @@ class LeakyParallel(nn.Module):
     ):
         super().__init__()
 
+        # Note: nn.RNN dropout only applies to intermediate layers, not the last layer.
+        # We need to manually apply dropout to the output because we use num_layers=1.
+        # Dropout is not passed to nn.RNN as it would have no effect in this case.
         self.rnn = nn.RNN(
             input_size,
             hidden_size,
@@ -171,10 +174,16 @@ class LeakyParallel(nn.Module):
             nonlinearity="relu",
             bias=bias,
             batch_first=False,
-            dropout=dropout,
             device=device,
             dtype=dtype,
         )
+
+        # Store dropout value and create dropout layer if needed
+        self.dropout = dropout
+        if dropout > 0.0:
+            self.dropout_layer = nn.Dropout(dropout)
+        else:
+            self.dropout_layer = None
 
         self._beta_buffer(beta, learn_beta)
         self.hidden_size = hidden_size
@@ -211,14 +220,19 @@ class LeakyParallel(nn.Module):
     def forward(self, input_):
         mem = self.rnn(input_)
         # mem[0] contains relu'd outputs, mem[1] contains final hidden state
-        mem_shift = mem[0] - self.threshold  # self.rnn.weight_hh_l0
+        # Apply dropout to RNN output if dropout > 0
+        if self.dropout_layer is not None:
+            mem_output = self.dropout_layer(mem[0])
+        else:
+            mem_output = mem[0]
+        mem_shift = mem_output - self.threshold  # self.rnn.weight_hh_l0
         spk = self.spike_grad(mem_shift)
         spk = spk * self.graded_spikes_factor
         return spk
 
     @staticmethod
     def _surrogate_bypass(input_):
-        return (input_ > 0).float()
+        return (input_ > 0).to(input_.dtype)
 
     @staticmethod
     class ATan(torch.autograd.Function):
@@ -256,7 +270,7 @@ class LeakyParallel(nn.Module):
         def forward(ctx, input_, alpha=2.0):
             ctx.save_for_backward(input_)
             ctx.alpha = alpha
-            out = (input_ > 0).float()
+            out = (input_ > 0).to(input_.dtype)
             return out
 
         @staticmethod
@@ -291,15 +305,29 @@ class LeakyParallel(nn.Module):
                 elif isinstance(self.beta, torch.Tensor) or isinstance(
                     self.beta, torch.FloatTensor
                 ):
+                    # `_beta_buffer` always stores beta as a tensor, so the
+                    # length checks must be nested inside this branch --
+                    # they were previously siblings of this `elif`, which
+                    # made the per-neuron (`len == hidden_size`) path and
+                    # the `ValueError` unreachable, so a per-neuron beta
+                    # was dropped silently and `weight_hh_l0` kept its
+                    # random RNN initialization.
                     if len(self.beta) == 1:
                         self.rnn.weight_hh_l0.fill_(self.beta[0])
-                elif len(self.beta) == self.hidden_size:
-                    # Replace each value with the corresponding value in self.beta
-                    for i in range(self.hidden_size):
-                        self.rnn.weight_hh_l0.data[i].fill_(self.beta[i])
+                    elif len(self.beta) == self.hidden_size:
+                        # Replace each value with the corresponding value
+                        # in self.beta
+                        for i in range(self.hidden_size):
+                            self.rnn.weight_hh_l0.data[i].fill_(self.beta[i])
+                    else:
+                        raise ValueError(
+                            "Beta must be either a single value or of "
+                            "length 'hidden_size'."
+                        )
                 else:
-                    raise ValueError(
-                        "Beta must be either a single value or of length 'hidden_size'."
+                    raise TypeError(
+                        "Beta must be a float, int, or torch.Tensor; "
+                        f"got {type(self.beta)}."
                     )
 
     def _beta_buffer(self, beta, learn_beta):

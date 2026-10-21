@@ -1,4 +1,4 @@
-#from typing import Optional
+# from typing import Optional
 from typing import Optional, Tuple, Union
 import torch
 import os
@@ -7,7 +7,6 @@ import nir
 import numpy as np
 import nirtorch
 import snntorch as snn
-
 
 
 def _extract_snntorch_module(module: torch.nn.Module) -> Optional[nir.NIRNode]:
@@ -39,7 +38,7 @@ def _extract_snntorch_module(module: torch.nn.Module) -> Optional[nir.NIRNode]:
             groups=module.groups,
         )
     """
-    #modifiying bias of the conv2d layer extraction 
+    # modifiying bias of the conv2d layer extraction
     if isinstance(module, torch.nn.Conv2d):
         return nir.Conv2d(
             input_shape=None,
@@ -48,7 +47,7 @@ def _extract_snntorch_module(module: torch.nn.Module) -> Optional[nir.NIRNode]:
             padding=module.padding,
             dilation=module.dilation,
             groups=module.groups,
-            #better handle for the bias if it's False
+            # better handle for the bias if it's False
             bias=(
                 module.bias.detach()
                 if isinstance(module.bias, torch.Tensor)
@@ -58,17 +57,17 @@ def _extract_snntorch_module(module: torch.nn.Module) -> Optional[nir.NIRNode]:
     elif isinstance(module, torch.nn.AvgPool2d):
         return nir.AvgPool2d(
             kernel_size=module.kernel_size,  # (Height, Width)
-            stride=module.kernel_size
-            if module.stride is None
-            else module.stride,  # (Height, width)
+            stride=(
+                module.kernel_size if module.stride is None else module.stride
+            ),  # (Height, width)
             padding=(0, 0),  # (Height, width)
         )
 
     elif isinstance(module, snn.Leaky):
         dt = 1e-4
 
-        beta = module.beta.detach().numpy()
-        vthr = module.threshold.detach().numpy()
+        beta = module.beta.detach().cpu().numpy()
+        vthr = module.threshold.detach().cpu().numpy()
         vthr = np.array([vthr]) if isinstance(vthr, (int, float)) else vthr
         tau_mem = dt / (1 - beta)
         r = tau_mem / dt
@@ -84,20 +83,20 @@ def _extract_snntorch_module(module: torch.nn.Module) -> Optional[nir.NIRNode]:
 
     elif isinstance(module, torch.nn.Linear):
         if module.bias is None:
-            return nir.Linear(weight=module.weight.data.detach().numpy())
+            return nir.Linear(weight=module.weight.data.detach().cpu().numpy())
         else:
             return nir.Affine(
-                weight=module.weight.data.detach().numpy(),
-                bias=module.bias.data.detach().numpy(),
+                weight=module.weight.data.detach().cpu().numpy(),
+                bias=module.bias.data.detach().cpu().numpy(),
             )
 
     elif isinstance(module, snn.Synaptic):
         dt = 1e-4
 
         # TODO: assert that size of the current layer is correct
-        alpha = module.alpha.detach().numpy()
-        beta = module.beta.detach().numpy()
-        vthr = module.threshold.detach().numpy()
+        alpha = module.alpha.detach().cpu().numpy()
+        beta = module.beta.detach().cpu().numpy()
+        vthr = module.threshold.detach().cpu().numpy()
         vthr = np.array([vthr]) if isinstance(vthr, (int, float)) else vthr
 
         tau_syn = dt / (1 - alpha)
@@ -130,13 +129,13 @@ def _extract_snntorch_module(module: torch.nn.Module) -> Optional[nir.NIRNode]:
                     "V must be a vector, cannot infer layer size for scalar V"
                 )
             n_neurons = module.recurrent.V.shape[0]
-            w = np.diag(module.recurrent.V.data.detach().numpy())
+            w = np.diag(module.recurrent.V.data.detach().cpu().numpy())
             w_rec = nir.Linear(weight=w)
 
         dt = 1e-4
 
-        beta = module.beta.detach().numpy()
-        vthr = module.threshold.detach().numpy()
+        beta = module.beta.detach().cpu().numpy()
+        vthr = module.threshold.detach().cpu().numpy()
         beta = np.ones(n_neurons) * beta
         vthr = np.ones(n_neurons) * vthr
 
@@ -176,14 +175,14 @@ def _extract_snntorch_module(module: torch.nn.Module) -> Optional[nir.NIRNode]:
                     "V must be a vector, cannot infer layer size for scalar V"
                 )
             n_neurons = module.recurrent.V.shape[0]
-            w = np.diag(module.recurrent.V.data.detach().numpy())
+            w = np.diag(module.recurrent.V.data.detach().cpu().numpy())
             w_rec = nir.Linear(weight=w)
 
         dt = 1e-4
 
-        alpha = module.alpha.detach().numpy()
-        beta = module.beta.detach().numpy()
-        vthr = module.threshold.detach().numpy()
+        alpha = module.alpha.detach().cpu().numpy()
+        beta = module.beta.detach().cpu().numpy()
+        vthr = module.threshold.detach().cpu().numpy()
         alpha = np.ones(n_neurons) * alpha
         beta = np.ones(n_neurons) * beta
         vthr = np.ones(n_neurons) * vthr

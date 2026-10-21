@@ -9,7 +9,7 @@ class StateQuant(torch.autograd.Function):
     def forward(ctx, input_, levels):
 
         device = input_.device
-        levels = levels.to(device)
+        levels = levels.to(device=device, dtype=input_.dtype)
         size = input_.size()
         input_ = input_.flatten()
 
@@ -189,15 +189,15 @@ def state_quant(
                 for j in reversed(
                     range(lower_bits)
                 ):  # figure out how much the summation travels
-                    lower_curr = multiplier ** j
-                    lower_summation += multiplier ** j
+                    lower_curr = multiplier**j
+                    lower_summation += multiplier**j
 
                 lower_room = lower_summation / lower_range
                 min_temp_sum = min_val
                 # store_val.append(min_temp_sum)
 
                 for j in range(lower_bits):
-                    lower_curr = multiplier ** j
+                    lower_curr = multiplier**j
                     store_val.append(min_temp_sum)
                     min_temp_sum += lower_curr / lower_room
                     # store_val.append(min_temp_sum)
@@ -206,8 +206,8 @@ def state_quant(
 
                 upper_summation = 0
                 for j in reversed(range(upper_bits)):
-                    upper_curr = multiplier ** j
-                    upper_summation += multiplier ** j
+                    upper_curr = multiplier**j
+                    upper_summation += multiplier**j
 
                 upper_room = upper_summation / upper_range
 
@@ -215,7 +215,7 @@ def state_quant(
                 diff_store_val = []
                 # store_val.append(max_temp_sum)
                 for j in reversed(range(upper_bits)):
-                    upper_curr = multiplier ** j
+                    upper_curr = multiplier**j
                     # store_val.append(max_temp_sum)
                     max_temp_sum += upper_curr / upper_room
                     store_val.append(max_temp_sum)
@@ -261,8 +261,8 @@ def state_quant(
                 for j in reversed(
                     range(lower_bits)
                 ):  # figure out how much the summation travels
-                    lower_curr = multiplier ** j
-                    lower_summation += multiplier ** j
+                    lower_curr = multiplier**j
+                    lower_summation += multiplier**j
 
                 lower_room = lower_summation / lower_range
 
@@ -270,7 +270,7 @@ def state_quant(
                 # store_val.append(min_temp_sum)
 
                 for j in range(lower_bits):
-                    lower_curr = multiplier ** j
+                    lower_curr = multiplier**j
                     store_val.append(min_temp_sum)
                     min_temp_sum += lower_curr / lower_room
 
@@ -280,8 +280,8 @@ def state_quant(
 
                 upper_summation = 0
                 for j in reversed(range(upper_bits)):
-                    upper_curr = multiplier ** j
-                    upper_summation += multiplier ** j
+                    upper_curr = multiplier**j
+                    upper_summation += multiplier**j
 
                 upper_room = upper_summation / upper_range
 
@@ -289,7 +289,7 @@ def state_quant(
                 diff_store_val = []
                 # store_val.append(max_temp_sum)
                 for j in reversed(range(upper_bits)):
-                    upper_curr = multiplier ** j
+                    upper_curr = multiplier**j
                     max_temp_sum += upper_curr / upper_room
                     store_val.append(max_temp_sum)
 

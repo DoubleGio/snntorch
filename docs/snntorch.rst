@@ -28,11 +28,41 @@ At present, the neurons available in :mod:`snntorch` are variants of the Leaky I
 Neuron models that accelerate training require passing data in parallel. Available neurons include:
 * **LeakyParallel** - 1st Order Leaky Integrate-and-Fire Neuron
 
+Connection primitives:
+
+* **SynapticDelay** - per-channel axonal / synaptic transmission delay with an optionally learnable delay time. Drop it between a connection and a neuron (``fc -> SynapticDelay -> Leaky``) to give a pathway a lag. Works step-by-step or on a whole ``(time, batch, channels)`` sequence, and the fractional delay is realised by interpolation so it can be trained by backprop.
+
 Additional models include spiking-LSTMs and spiking-ConvLSTMs:
 
-* **SLSTM** - Spiking long short-term memory cell with state-thresholding 
+* **SLSTM** - Spiking long short-term memory cell with state-thresholding
 * **SConv2dLSTM** - Spiking 2d convolutional short-term memory cell with state thresholding
 
+Need a neuron model that isn't listed above? :func:`snntorch.neuron_from_equations` generates a new neuron **class** from your own state equations -- specify the state variable(s) and how they update, and the result behaves like any other neuron here (``init_hidden``, ``output``, ``threshold``, ``spike_grad``, ``reset_mechanism`` all work)::
+
+      import snntorch as snn
+
+      def izh_update(states, I):
+          v, u = states["v"], states["u"]
+          dv = 0.04 * v ** 2 + 5 * v + 140 - u + I
+          du = 0.02 * (0.2 * v - u)
+          return {"v": v + dv, "u": u + du}
+
+      def izh_reset(states, spk, threshold):
+          v, u = states["v"], states["u"]
+          fired = spk.detach().bool()
+          v = torch.where(fired, torch.full_like(v, -65.0), v)
+          u = torch.where(fired, u + 8.0, u)
+          return {"v": v, "u": u}
+
+      Izhikevich = snn.neuron_from_equations(
+          "Izhikevich", state_names=("v", "u"), update_fn=izh_update,
+          spike_state="v", reset_fn=izh_reset, init_values={"v": -65.0, "u": -13.0},
+      )
+
+      lif1 = Izhikevich(threshold=30.0)
+      spk, v, u = lif1(I)
+
+See :mod:`snntorch._neurons.customneuron` for the full reference.
 
 
 How to use snnTorch's neuron models
@@ -47,7 +77,16 @@ The following arguments are common across most neuron models:
 * **learn_beta** - setting to ``True`` enables the decay rate to be a learnable parameter
 * **learn_threshold** - setting to ``True`` enables the threshold to be a learnable parameter 
 * **reset_mechanism** - options include ``subtract`` (reset-by-subtraction), ``zero`` (reset-to-zero), and ``none`` (no reset mechanism: i.e., leaky integrator neuron)
-* **output** - if ``init_hidden=True``, the spiking neuron will only return the output spikes. Setting ``output=True`` enables the hidden state(s) to be returned as well. Useful when using ``torch.nn.sequential``. 
+* **output** - if ``init_hidden=True``, the spiking neuron will only return the output spikes. Setting ``output=True`` enables the hidden state(s) to be returned as well. Useful when using ``torch.nn.sequential``.
+
+**Homeostasis (adaptive, time-varying threshold).** Every neuron built on :mod:`snntorch.SpikingNeuron` -- i.e. all of them -- can turn on spike-frequency adaptation by calling ``lif.enable_homeostasis(increment=0.5, tau=20.0, max_adapt=None)``. A per-neuron component is added on top of the static ``threshold``: it decays back toward 0 with time-constant ``tau`` every time step, and jumps up by ``increment`` for every neuron that fires. A neuron that has been firing raises its own effective threshold, so it fires progressively less until the adaptive component relaxes away -- classic intrinsic homeostatic plasticity, off by default and detached from the autograd graph (it is not learned by backprop, only the usual weights/``beta``/``threshold`` are). ``max_adapt`` optionally caps it. Use ``lif.reset_homeostasis()`` to clear the accumulated component, and ``lif.disable_homeostasis()`` to turn the mechanism off again (keeping the accumulated value)::
+
+      lif1 = snn.Leaky(beta=0.9)
+      lif1.enable_homeostasis(increment=0.5, tau=20.0)
+
+      mem1 = lif1.init_leaky()
+      for step in range(num_steps):
+          spk1, mem1 = lif1(cur1, mem1)   # firing rate self-limits under sustained drive
 
 Leaky integrate-and-fire neuron models also include:
 

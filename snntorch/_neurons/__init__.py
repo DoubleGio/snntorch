@@ -19,8 +19,11 @@ __neuron__ = [
     "rleaky",
     "rsynaptic",
     "synaptic",
+    "customneuron",
+    "synapticdelay",
     "sconv2dlstm",
     "slstm",
+    "gen2",
 ]
 
 from .neurons import SpikingNeuron
@@ -31,6 +34,7 @@ from .lapicque import Lapicque
 from .leaky import Leaky
 from .linearleaky import LinearLeaky
 from .stateleaky import StateLeaky
+from .associative import AssociativeLeaky
 from .synaptic import Synaptic
 
 from .rleaky import RLeaky
@@ -40,3 +44,7 @@ from .sconv2dlstm import SConv2dLSTM
 from .slstm import SLSTM
 
 from .leakyparallel import LeakyParallel
+
+from .customneuron import CustomNeuron
+from .customneuron import neuron_from_equations
+from .synapticdelay import SynapticDelay

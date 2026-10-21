@@ -11,7 +11,6 @@ def rate(
     first_spike_time=0,
     time_var_input=False,
 ):
-
     """Spike rate encoding of input data. Convert tensor into Poisson spike
     trains using the features as the mean of a
     binomial distribution. If `num_steps` is specified, then the data will be
@@ -300,7 +299,7 @@ def latency(
 
         spike_data = torch.zeros(
             (tuple([num_steps] + list(spike_time.size()))),
-            dtype=dtype,
+            dtype=data.dtype,
             device=device,
         )
 
@@ -535,7 +534,6 @@ def latency_code_linear(
     first_spike_time=0,
     normalize=False,
 ):
-
     """Linear latency encoding of input data. Convert input features
     or target labels to spike times.
 
@@ -605,7 +603,6 @@ def latency_code_log(
     normalize=False,
     epsilon=1e-7,
 ):
-
     """Logarithmic latency encoding of input data. Convert input features
     or target labels to spike times.
 
@@ -671,7 +668,6 @@ def latency_code_log(
 def _latency_errors(
     data, num_steps, threshold, tau, first_spike_time, normalize
 ):
-
     """Catch errors for spike time encoding latency functions
     ``latency_code_linear`` and ``latency_code_log``"""
 
@@ -885,7 +881,6 @@ def targets_rate(
     interpolate=False,
     epsilon=1e-7,
 ):
-
     """Spike rate encoding of targets. Input tensor must be one-dimensional
     with target indexes.
     If the output tensor is time-varying, the returned tensor will have
@@ -1308,7 +1303,6 @@ def rate_interpolate(
 
 
 def latency_interpolate(spike_time, num_steps, on_target=1, off_target=0):
-
     """Apply linear interpolation to a tensor of target spike times to
     enable gradual increasing membrane.
     Each spike is assumed to occur from a separate neuron.
@@ -1357,19 +1351,17 @@ def latency_interpolate(spike_time, num_steps, on_target=1, off_target=0):
 
     device = spike_time.device
 
-    spike_time = torch.round(
-        spike_time
-    ).float()  # Needs to be float as 0s and out-of-bounds spikes
-    # are set to 0.5
+    # Needs to be rounded, as 0s and out-of-bounds spikes are set to 0.5
+    spike_time = torch.round(spike_time).to(spike_time.dtype)
 
-    spike_time[
-        spike_time > num_steps
-    ] = 0.5  # avoid div by 0. instead setting spike time to < 1
+    spike_time[spike_time > num_steps] = (
+        0.5  # avoid div by 0. instead setting spike time to < 1
+    )
     # --> (step/spike_time) > 1, which gets clipped.
 
     interpolated_targets = torch.ones(
         (tuple([num_steps] + list(spike_time.size()))),
-        dtype=dtype,
+        dtype=spike_time.dtype,
         device=device,
     )
 
@@ -1415,7 +1407,6 @@ def targets_latency(
     epsilon=1e-7,
     bypass=False,
 ):
-
     """Latency encoding of target labels. Use target labels to determine
     time-to-first spike. Expected input is index of correct class.
     The index is one-hot-encoded before being passed to ``spikegen.latency``.

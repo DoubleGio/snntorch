@@ -1,6 +1,5 @@
 """Tests for `snntorch.spikegen` module."""
 
-
 import pytest
 import snntorch as snn
 from snntorch import spikegen

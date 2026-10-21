@@ -125,7 +125,6 @@ def load_shd_hdf5(filename, train=True):
 
 
 class SHD(NeuromorphicDataset):
-
     """`Spiking Heidelberg Digits
     <https://zenkelab.org/resources/spiking-heidelberg-datasets-shd/>`_
     Dataset.

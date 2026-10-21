@@ -45,7 +45,6 @@ mapping = {
 
 
 class NMNIST(NeuromorphicDataset):
-
     """`NMNIST <https://www.garrickorchard.com/datasets/n-mnist>`_ Dataset.
 
     The Neuromorphic-MNIST (NMNIST) dataset is a spiking version of the

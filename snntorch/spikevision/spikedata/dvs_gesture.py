@@ -49,7 +49,6 @@ mapping = {
 
 
 class DVSGesture(NeuromorphicDataset):
-
     """`DVS Gesture <https://www.research.ibm.com/dvsgesture/>`_ Dataset.
 
     The data was recorded using a DVS128. The dataset contains 11
